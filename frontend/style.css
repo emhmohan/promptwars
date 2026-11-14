@@ -87,7 +87,8 @@ input[type=range]{accent-color:#0a0a0a;padding:0;vertical-align:middle;border:0}
 .ov{overflow-x:auto}svg{width:100%;min-width:560px}svg text{fill:var(--fg);font:11px var(--sans);text-anchor:middle}
 svg.ico,.ico svg{min-width:0}svg.ico{width:16px}svg.ico.sm{width:13px}svg.ico.lg{width:20px}
 .edge{fill:none;stroke:var(--bd2);stroke-width:1.6}.edge.eok{stroke:var(--ink)}
-.n-ok{fill:var(--ink)}.n-wk{fill:var(--wk)}.n-no{fill:var(--no)}
+svg text.nm{font-weight:600;paint-order:stroke;stroke:var(--card);stroke-width:4px}svg text.pc{fill:var(--mut);font-size:10px;paint-order:stroke;stroke:var(--card);stroke-width:4px}svg text.tick{fill:#fff;font-size:14px;font-weight:700}
+.n-ok{fill:var(--ok)}.n-wk{fill:var(--wk)}.n-no{fill:var(--no)}
 .req{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-dasharray:3 4;animation:spin 16s linear infinite;transform-box:fill-box;transform-origin:center}
 @keyframes spin{to{transform:rotate(360deg)}}
 .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px}.legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:var(--c)}

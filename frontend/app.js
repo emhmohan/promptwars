@@ -123,17 +123,18 @@ function depth(s) { const p = META.skills[s].prereqs; return p.length ? 1 + Math
 function graph() {
   const L = {}; Object.keys(META.skills).forEach(s => (L[depth(s)] = L[depth(s)] || []).push(s));
   const pos = {}, req = META.roles[ST.goal].skills; let rows = 1;
-  Object.keys(L).forEach(d => { rows = Math.max(rows, L[d].length); L[d].forEach((s, i) => pos[s] = [55 + d * 150, 35 + i * 52]); });
+  const CW = 190, RH = 82, R = 15;
+  Object.keys(L).forEach(d => { rows = Math.max(rows, L[d].length); L[d].forEach((s, i) => pos[s] = [70 + d * CW, 34 + i * RH]); });
   let e = "", n = "";
   Object.keys(META.skills).forEach(s => META.skills[s].prereqs.forEach(p => {
-    const [x1, y1] = pos[p], [x2, y2] = pos[s], ok = (ST.prof[p] || 0) >= 0.6 && (ST.prof[s] || 0) >= 0.6;
-    e += `<path class="edge ${ok ? "eok" : ""}" d="M${x1} ${y1} C${x1 + 70} ${y1},${x2 - 70} ${y2},${x2} ${y2}"/>`;
+    const [x1, y1] = pos[p], [x2, y2] = pos[s], ok = (ST.prof[p] || 0) >= 0.6 && (ST.prof[s] || 0) >= 0.6, a = x1 + R + 6, b = x2 - R - 6, m = (b - a) / 2;
+    e += `<path class="edge ${ok ? "eok" : ""}" d="M${a} ${y1} C${a + m} ${y1},${b - m} ${y2},${b} ${y2}"/>`;
   }));
   Object.keys(META.skills).forEach(s => {
-    const v = ST.prof[s] || 0, c = v >= 0.6 ? "n-ok" : v > 0 ? "n-wk" : "n-no", [x, y] = pos[s];
-    n += `<g><title>${esc(META.skills[s].name)} · ${Math.round(v * 100)}%</title>${req.includes(s) ? `<circle class="req" cx="${x}" cy="${y}" r="20"/>` : ""}<circle class="${c}" cx="${x}" cy="${y}" r="13"/><text x="${x}" y="${y + 34}">${esc(META.skills[s].name)}</text></g>`;
+    const v = ST.prof[s] || 0, c = v >= 0.6 ? "n-ok" : v > 0 ? "n-wk" : "n-no", [x, y] = pos[s], pct = Math.round(v * 100);
+    n += `<g><title>${esc(META.skills[s].name)} · ${pct}%${req.includes(s) ? " · required" : ""}</title>${req.includes(s) ? `<circle class="req" cx="${x}" cy="${y}" r="${R + 7}"/>` : ""}<circle class="${c}" cx="${x}" cy="${y}" r="${R}"/>${v >= 0.6 ? `<text class="tick" x="${x}" y="${y + 4}">✓</text>` : ""}<text class="nm" x="${x}" y="${y + 36}">${esc(META.skills[s].name)}</text><text class="pc" x="${x}" y="${y + 49}">${pct ? pct + "%" : "not started"}</text></g>`;
   });
-  return `<div class="ov"><svg viewBox="0 0 ${60 + (Math.max(...Object.keys(L)) + 1) * 150} ${64 + rows * 52}">${e}${n}</svg></div>
+  return `<div class="ov"><svg viewBox="0 0 ${100 + Math.max(...Object.keys(L)) * CW + 80} ${rows * RH + 20}" style="min-width:${(Math.max(...Object.keys(L)) + 1) * 150}px">${e}${n}</svg></div>
   <div class="legend mut"><span style="--c:var(--ok)">verified</span><span style="--c:var(--wk)">weak / unverified</span><span style="--c:var(--no)">not started</span><span style="--c:var(--ac2)">required for ${esc(ST.role_name)}</span></div>`;
 }
 function timeline() {
