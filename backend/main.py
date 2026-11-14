@@ -1,0 +1,201 @@
+"""FastAPI app. Run from project root:  uvicorn backend.main:app --reload"""
+import pathlib
+from dotenv import load_dotenv
+load_dotenv(pathlib.Path(__file__).resolve().parent.parent / ".env")
+
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from typing import List, Optional
+
+from . import agents as A, llm, orchestrator as O, store
+
+app = FastAPI(title="CareerPipe Career CI/CD")
+
+
+def need(uid):
+    L = store.get(uid)
+    if not L: raise HTTPException(404, "learner not found")
+    return L
+
+
+class NewLearner(BaseModel):
+    name: str
+    goal: str = "fs"
+    hours: int = 8
+    claimed: List[str] = []
+    resume_text: str = ""
+    certifications: List[str] = []
+    projects: List[str] = []
+
+class Profile(BaseModel):
+    certifications: List[str] = []
+    projects: List[str] = []
+
+class Choice(BaseModel):
+    skill: str
+    choice: int
+    context: str = "quiz"
+
+class Goal(BaseModel): goal: str
+class Hours(BaseModel): hours: int
+class Skill(BaseModel): skill: str
+class Msg(BaseModel): message: str
+class Days(BaseModel): days: int = 60
+class IAnswer(BaseModel):
+    round: str = "technical"
+    skill: Optional[str] = None
+    question: str
+    answer: str
+class Ev(BaseModel):
+    skill: str
+    text: str
+class JD(BaseModel): text: str
+class Doc(BaseModel):
+    text: str
+    kind: str = "resume"
+class Syl(BaseModel):
+    text: str
+    role: str = "fs"
+
+
+@app.get("/api/status")
+def status(): return llm.status()
+
+@app.get("/api/meta")
+def meta():
+    return {"skills": {k: {"name": v["name"], "prereqs": v["prereqs"]} for k, v in A.SK.items()},
+            "roles": {k: {"name": v["name"], "skills": v["skills"]} for k, v in A.ROLES.items()}}
+
+@app.get("/api/learners")
+def learners(): return [{"id": L["id"], "name": L["name"], "goal": L["goal"]} for L in store.all_learners()]
+
+@app.post("/api/learners")
+def create(b: NewLearner):
+    if b.goal not in A.ROLES: raise HTTPException(400, "unknown role")
+    return O.snapshot(O.onboard(b.name, b.goal, b.hours, [s for s in b.claimed if s in A.SK], b.resume_text, b.certifications, b.projects))
+
+@app.put("/api/learners/{uid}/profile")
+def profile(uid: str, b: Profile): return O.snapshot(O.update_profile(need(uid), b.certifications, b.projects))
+
+@app.get("/api/learners/{uid}")
+def get(uid: str): return O.snapshot(need(uid))
+
+@app.post("/api/learners/{uid}/goal")
+def goal(uid: str, b: Goal):
+    if b.goal not in A.ROLES: raise HTTPException(400, "unknown role")
+    return O.snapshot(O.set_goal(need(uid), b.goal))
+
+@app.post("/api/learners/{uid}/hours")
+def hours(uid: str, b: Hours): return O.snapshot(O.set_hours(need(uid), b.hours))
+
+@app.get("/api/learners/{uid}/question")
+def question(uid: str, skill: str, fresh: bool = False, hard: bool = False):
+    L = need(uid)
+    if skill not in A.SK: raise HTTPException(400, "unknown skill")
+    q = A.AssessmentAgent().question(L, skill, fresh, hard); store.save(L); return q
+
+@app.post("/api/learners/{uid}/answer")
+def answer(uid: str, b: Choice):
+    L = need(uid); r = O.answer(L, b.skill, b.choice, b.context)
+    return {"result": r, "state": O.snapshot(L)}
+
+@app.post("/api/learners/{uid}/simulate-fail")
+def sim_fail(uid: str, b: Skill):
+    L = need(uid); O.fail(L, b.skill, "simulated quiz"); return O.snapshot(L)
+
+@app.post("/api/learners/{uid}/interview/next")
+def inext(uid: str, round: str = "technical", skill: Optional[str] = None):
+    L = need(uid); O.log(L, "Interviewer Agent", f"Preparing a {round} question."); store.save(L)
+    return A.Interviewer().question(L, round, skill)
+
+@app.post("/api/learners/{uid}/interview/answer")
+def ianswer(uid: str, b: IAnswer):
+    L = need(uid); ev = O.interview_answer(L, b.round, b.skill, b.question, b.answer)
+    return {"eval": ev, "state": O.snapshot(L)}
+
+@app.get("/api/learners/{uid}/rejection")
+def rejection(uid: str):
+    L = need(uid); r = A.Recruiter().rejection(L, L["gap"]); O.log(L, "Recruiter Agent", "Wrote an honest rejection review."); store.save(L); return r
+
+@app.get("/api/learners/{uid}/roles")
+def roles(uid: str): return A.GapAnalyst().all_roles(need(uid))
+
+@app.post("/api/learners/{uid}/evidence")
+def evidence(uid: str, b: Ev):
+    L = need(uid)
+    if b.skill not in A.SK: raise HTTPException(400, "unknown skill")
+    r = O.evidence(L, b.skill, b.text); return {"result": r, "state": O.snapshot(L)}
+
+@app.get("/api/learners/{uid}/explain")
+def explain(uid: str, skill: str):
+    if skill not in A.SK: raise HTTPException(400, "unknown skill")
+    return O.explain(need(uid), skill)
+
+@app.post("/api/learners/{uid}/document")
+def document(uid: str, b: Doc):
+    L = need(uid); skills = O.from_document(L, b.text, b.kind if b.kind in ("resume", "course description", "job description") else "document")
+    return {"skills": skills, "state": O.snapshot(L)}
+
+@app.post("/api/learners/{uid}/jobmatch")
+def jobmatch(uid: str, b: JD):
+    L = need(uid); r = A.JobMatcher().match(L, b.text)
+    O.log(L, "Job Match Agent", f"Compared a job posting: {r['match']}% covered by verified skills."); store.save(L); return r
+
+@app.get("/api/learners/{uid}/resume")
+def resume(uid: str):
+    L = need(uid); pp = O.passport(L); b = A.ResumeAgent().bullets(L, pp)
+    O.log(L, "Resume Agent", f"Wrote {len(b)} resume bullet(s) from verified evidence only."); store.save(L)
+    return {"bullets": b, "note": "Built only from verified skills, accepted project evidence and listed certifications."}
+
+@app.get("/api/learners/{uid}/passport")
+def passport(uid: str): return O.passport(need(uid))
+
+@app.post("/api/learners/{uid}/decay")
+def decay(uid: str, b: Days): return O.snapshot(O.decay(need(uid), b.days))
+
+@app.post("/api/learners/{uid}/mentor")
+def mentor(uid: str, b: Msg):
+    L = need(uid); r = A.Mentor().chat(L, b.message); O.log(L, "Mentor Agent", "Answered a learner question."); store.save(L); return {"reply": r}
+
+@app.get("/api/cohort")
+def cohort(): return A.CohortAnalyst().report(store.all_learners())
+
+@app.post("/api/syllabus")
+def syllabus(b: Syl):
+    if b.role not in A.ROLES: raise HTTPException(400, "unknown role")
+    return A.CohortAnalyst().syllabus(b.text, b.role)
+
+@app.post("/api/demo/guided")
+def guided():
+    """One-click replay of the story: onboard, verify, fail React (root-cause re-plan), add project evidence."""
+    L = O.onboard("Asha", "fs", 8, ["python", "sql", "html"],
+                  "", ["Meta Front-End Developer certificate"], ["Built a Python script that loads SQL data into a dashboard"])
+    for sk in ("python", "sql"):
+        q = A.AssessmentAgent().question(L, sk); pool = A.AssessmentAgent().pool(sk)
+        O.answer(L, sk, next((p["answer"] for p in pool if p["q"] == q["q"]), pool[0]["answer"]), "diagnostic")
+    O.fail(L, "react", "guided demo: simulated quiz failure")
+    O.evidence(L, "html", "Built a responsive portfolio site in HTML and CSS, deployed on GitHub Pages, tested layouts at 3 breakpoints, designed accessible forms, 120 visitors.")
+    return O.snapshot(L)
+
+@app.post("/api/demo/seed")
+def seed():
+    # (name, goal, claimed, skills to verify with a correct quiz answer)
+    samples = [("Asha", "fs", ["python", "sql", "html"], ["python", "sql", "html"]),
+               ("Ravi", "fs", ["html", "css", "js"], ["html", "css", "js", "git"]),
+               ("Meena", "ml", ["python", "stats"], ["python"]),
+               ("Karthik", "da", ["sql", "python"], ["sql", "python", "stats"]),
+               ("Divya", "genai", ["python", "api", "git"], ["python", "api"]),
+               ("Arun", "be", ["python", "git"], [])]
+    existing = {l["name"] for l in store.all_learners()}
+    for n, g, c, verify in samples:
+        if n in existing: continue
+        L = O.onboard(n, g, 8, c)
+        for sk in verify:
+            q = A.AssessmentAgent().question(L, sk)
+            pool = A.AssessmentAgent().pool(sk)
+            ans = next((p["answer"] for p in pool if p["q"] == q["q"]), pool[0]["answer"])
+            O.answer(L, sk, ans, "diagnostic")
+    return cohort()
+
+app.mount("/", StaticFiles(directory=str(pathlib.Path(__file__).resolve().parent.parent / "frontend"), html=True), name="ui")

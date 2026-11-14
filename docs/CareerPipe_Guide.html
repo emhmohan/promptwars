@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>CareerPipe Guide</title>
+<style>
+@page{size:A4;margin:18mm}
+body{font:14px/1.55 -apple-system,Segoe UI,Arial,sans-serif;color:#0a0a0a;max-width:780px;margin:0 auto;padding:24px}
+h1{font-size:30px;margin:0 0 4px}h2{font-size:19px;margin:28px 0 8px;border-bottom:2px solid #0a0a0a;padding-bottom:4px;break-after:avoid}
+h3{font-size:15px;margin:16px 0 4px}p,li{margin:4px 0}.sub{color:#555;margin-bottom:18px}
+code,pre{font-family:Consolas,monospace;background:#f4f4f4;border-radius:4px}code{padding:1px 5px}
+pre{padding:10px 12px;overflow:auto;border:1px solid #ddd;break-inside:avoid}
+table{border-collapse:collapse;width:100%;margin:8px 0}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}th{background:#0a0a0a;color:#fff}
+.box{border:1px solid #0a0a0a;padding:10px 14px;margin:10px 0;break-inside:avoid}
+</style></head><body>
+<h1>CareerPipe: Career CI/CD</h1>
+<div class="sub">Setup, LLM keys, demo walkthrough and extension guide</div>
+
+<h2>1. What it is</h2>
+<p>CareerPipe treats a career like a codebase. A target role is a test suite, skill gaps are failing tests, the roadmap is the fix list,
+the mock interview is the integration test, the skill passport is the release tag, and changing your goal is a branch.</p>
+<p>A visible council of agents (Strategist, Pedagogy, Time Budget, Arbiter) debates the plan. Every handoff is logged in the UI.
+All agents work without any LLM; an LLM only enriches wording and generates fresh questions.</p>
+
+<h2>2. Setup</h2>
+<ol>
+<li>Install Python 3.10 or newer.</li>
+<li>Open the project folder in a terminal.</li>
+<li>Windows: run <code>run.bat</code>. Mac/Linux: run <code>./run.sh</code>. This creates a virtual environment, installs <code>requirements.txt</code> and starts the server.</li>
+<li>Open <code>http://localhost:8000</code>.</li>
+</ol>
+<p>Manual setup:</p>
+<pre>python -m venv .venv
+.venv\Scripts\activate          (Mac/Linux: source .venv/bin/activate)
+pip install -r requirements.txt
+copy .env.example .env          (Mac/Linux: cp .env.example .env)
+uvicorn backend.main:app --reload --port 8000</pre>
+<p>Run the tests with <code>pytest -q tests</code>. Tests use a temporary database and never touch your learner data.</p>
+<p>Learner data is stored in <code>backend/data/learners.json</code>. Set <code>CAREERPIPE_DB</code> to use a different file (for example for a clean demo).</p>
+
+<h2>3. Turning the LLM on</h2>
+<p>Edit <code>.env</code>, set <code>LLM_PROVIDER</code> and the matching key, then restart the server. The header badge shows the active provider.
+On any error (bad key, quota, network, invalid JSON) the agents silently fall back to rules, so the demo cannot break.</p>
+<table>
+<tr><th>Provider</th><th>.env settings</th></tr>
+<tr><td>mock (default)</td><td><code>LLM_PROVIDER=mock</code>. No key needed.</td></tr>
+<tr><td>Groq (free, open-source Llama)</td><td><code>LLM_PROVIDER=groq</code>, <code>GROQ_API_KEY=...</code> (key from console.groq.com), optional <code>GROQ_MODEL</code></td></tr>
+<tr><td>OpenRouter (free ":free" models)</td><td><code>LLM_PROVIDER=openrouter</code>, <code>OPENROUTER_API_KEY=...</code>, optional <code>OPENROUTER_MODEL</code></td></tr>
+<tr><td>Gemini</td><td><code>LLM_PROVIDER=gemini</code>, <code>GEMINI_API_KEY=...</code>, optional <code>GEMINI_MODEL</code></td></tr>
+<tr><td>OpenAI</td><td><code>LLM_PROVIDER=openai</code>, <code>OPENAI_API_KEY=...</code>, optional <code>OPENAI_MODEL</code></td></tr>
+<tr><td>Anthropic</td><td><code>LLM_PROVIDER=anthropic</code>, <code>ANTHROPIC_API_KEY=...</code>, optional <code>ANTHROPIC_MODEL</code></td></tr>
+<tr><td>Ollama (local)</td><td><code>LLM_PROVIDER=ollama</code>, <code>OLLAMA_URL=http://localhost:11434</code>, <code>OLLAMA_MODEL=llama3.1</code></td></tr>
+</table>
+<div class="box">Never commit <code>.env</code>. It is listed in <code>.gitignore</code>.</div>
+
+<p><b>Shortcut:</b> on the onboarding screen, click <b>Guided demo (Asha story)</b>. It onboards Asha, verifies Python and SQL, fails React (JavaScript refresher), and adds project evidence in one click.</p>
+<h2>4. Five-minute demo walkthrough</h2>
+<ol>
+<li><b>Onboard.</b> Name "Asha", goal Full Stack Developer, claim Python, SQL and HTML. The pipeline shows the failing tests: JavaScript, CSS, Git, REST APIs, Testing, React, Node.</li>
+<li><b>Council.</b> Open the agent log. Strategist puts JavaScript first because it unlocks React and Node. Pedagogy and the Arbiter merge this into a dependency-safe order.</li>
+<li><b>Verify, don't trust.</b> Open the quiz and answer Python, SQL and HTML. Claimed skills turn into verified tests only after evidence.</li>
+<li><b>Root-cause re-plan.</b> Use "simulate fail" on React. The Mentor inserts a JavaScript refresher instead of repeating React.</li>
+<li><b>Goal switch (branch).</b> Change the goal to Backend Engineer. SQL stays green; the roadmap is recomputed and logged.</li>
+<li><b>Mock interview.</b> Answer one technical question and one HR question. The behavioral average gates the hire decision.</li>
+<li><b>Why I would not hire you.</b> The review shows REJECT with reasons, then the exact fixes that flip it to HIRE.</li>
+<li><b>Skill passport.</b> Print or save as PDF. Only skills that passed are listed, with evidence and a disclaimer.</li>
+<li><b>Skill decay.</b> Simulate 180 days without practice and watch verified skills fade and the plan adjust.</li>
+<li><b>Project evidence and deep-dive.</b> On the pipeline view, paste a project description for a skill; 6/10 or more counts as proof. Then choose "Project deep-dive" in the interview to be asked about your own project.</li>
+<li><b>Career matching, timeline, explain.</b> The pipeline view ranks every role by match with a one-click branch switch, charts job match over time, and "Explain my score" shows the quiz, interview and evidence behind any skill. A "Refresh due" banner flags skills going stale.</li>
+<li><b>Job match.</b> On the Review &amp; release tab, paste a real job posting and click "Match me". It shows verified, claimed-only and missing skills with one-click tests.</li>
+<li><b>Resume from proof.</b> On the Review &amp; release tab, click "Write resume bullets". Bullets use only verified skills, accepted project evidence and listed certifications.</li>
+<li><b>Organisation.</b> Click "Load demo cohort" to see the cohort dashboard and paste a syllabus into the gap analyzer.</li>
+</ol>
+
+<h2>5. How assessment works</h2>
+<ul>
+<li>Each skill has several multiple-choice questions that rotate, so repeat attempts see new questions.</li>
+<li>Quiz evidence uses the last 5 answers, recency-weighted. Interview scores use the last 3 answers.</li>
+<li>Proficiency blends 40% quiz and 60% interview. A skill passes at 60%. One wrong answer does not fail a skill if the blended score still passes.</li>
+<li>Hire decision: role match at least 80% and a behavioral (HR) average of at least 5/10.</li>
+<li>Verified skills decay with a half-life of 120 days; skills idle 30+ days or below the bar show a refresh-due banner.</li>
+<li>Project evidence scores concrete detail out of 10 (rule-based, enriched by the LLM); 6/10 or more verifies the skill at a 62% floor, lower than a full quiz plus interview.</li>
+<li>Certifications and projects in the profile add the skills they mention as claims to verify.</li>
+</ul>
+
+<h2>6. Adding roles, skills and questions</h2>
+<p>No code change is needed. Edit the JSON files in <code>backend/data/</code>.</p>
+<h3>skills.json</h3>
+<pre>"skills": { "docker": { "name": "Docker", "prereqs": ["git"], "weeks": 2,
+            "aliases": ["containers"], "resources": [ ... ] } },
+"roles":  { "devops": { "name": "DevOps Engineer", "skills": ["git","docker","api"] } }</pre>
+<h3>questions.json</h3>
+<p>Every skill needs one entry with a primary question, two extra questions and an interview prompt:</p>
+<pre>"docker": {
+  "mcq": {"q": "...", "options": ["A","B","C"], "answer": 1},
+  "more": [ {"q": "...", "options": ["A","B","C"], "answer": 0},
+            {"q": "...", "options": ["A","B","C"], "answer": 2} ],
+  "interview": {"q": "Explain ...", "keywords": ["image","container","layer"]}
+}</pre>
+<p><code>answer</code> is the zero-based index of the correct option. Interview answers are scored on keyword coverage and structure.</p>
+
+<h2>7. Troubleshooting</h2>
+<table>
+<tr><th>Problem</th><th>Fix</th></tr>
+<tr><td><code>python</code> not found on Windows</td><td>Use <code>py</code> instead, or reinstall Python with "Add to PATH".</td></tr>
+<tr><td>Port 8000 busy</td><td>Run uvicorn with <code>--port 8001</code>.</td></tr>
+<tr><td>Badge shows mock though a key is set</td><td>Check spelling in <code>.env</code> and restart the server.</td></tr>
+<tr><td>Want a clean demo</td><td>Stop the server and delete <code>backend/data/learners.json</code>, or start with a fresh <code>CAREERPIPE_DB</code>.</td></tr>
+</table>
+<p class="sub">MIT licensed. Scores are estimates from short quizzes and interview answers, not formal certification.</p>
+</body></html>

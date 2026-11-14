@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "careerpipe",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set CAREERPIPE_DB=%TEMP%\\cp_preview.json&& py -m uvicorn backend.main:app --port 8000"],
+      "port": 8000
+    }
+  ]
+}
