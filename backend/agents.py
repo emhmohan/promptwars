@@ -37,6 +37,12 @@ class ProfileAgent:
 
 
 # ------------------------------------------------------------- Assessment
+def valid_mcq(g, min_options):
+    """True if an LLM-written question has text, enough options and an in-range integer answer."""
+    return (isinstance(g, dict) and bool(g.get("q")) and isinstance(g.get("options"), list) and len(g["options"]) >= min_options
+            and isinstance(g.get("answer"), int) and 0 <= g["answer"] < len(g["options"]))
+
+
 class AssessmentAgent:
     name = "Assessment Agent"
 
@@ -58,9 +64,9 @@ class AssessmentAgent:
             for _ in range(3):
                 if not llm.available(): break
                 g = llm.complete_json(sysmsg, usr, None)
-                if isinstance(g, dict) and isinstance(g.get("options"), list) and len(g["options"]) >= 3 and isinstance(g.get("answer"), int) and 0 <= g["answer"] < len(g["options"]) and g.get("q"): break
+                if valid_mcq(g, 3): break
                 g = None
-            if isinstance(g, dict) and isinstance(g.get("options"), list) and len(g["options"]) >= 3                     and isinstance(g.get("answer"), int) and 0 <= g["answer"] < len(g["options"]) and g.get("q"):
+            if g:
                 g["hard"] = True
                 L["pending"][skill] = g
                 return {"skill": skill, "q": g["q"], "options": g["options"], "level": "hard"}
@@ -69,8 +75,7 @@ class AssessmentAgent:
         if fresh and llm.available():
             g = llm.complete_json("Write ONE multiple-choice question. JSON: {\"q\":str,\"options\":[3 strings],\"answer\":int index}.",
                                   f"Skill: {nm(skill)}. Must differ from: {q['q']}", None)
-            if isinstance(g, dict) and isinstance(g.get("options"), list) and len(g["options"]) >= 2 \
-                    and isinstance(g.get("answer"), int) and 0 <= g["answer"] < len(g["options"]) and g.get("q"):
+            if valid_mcq(g, 2):
                 q = g
         L["pending"][skill] = q
         return {"skill": skill, "q": q["q"], "options": q["options"]}

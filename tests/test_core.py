@@ -195,3 +195,22 @@ def test_accounts():
     assert c.get("/api/auth/me", headers={"Authorization": "Bearer " + l["token"]}).json()["learner_id"] == uid
     guest = c.post("/api/learners", json={"name": "G", "goal": "fs", "claimed": []}).json()["id"]
     assert c.get(f"/api/learners/{guest}").status_code == 200                  # guests still work
+
+
+def test_security_limits_and_headers():
+    r = c.get("/api/status")
+    assert r.headers["x-content-type-options"] == "nosniff" and r.headers["x-frame-options"] == "DENY"
+    assert "default-src 'self'" in r.headers["content-security-policy"]
+    uid = c.post("/api/learners", json={"name": "S", "goal": "fs", "claimed": []}).json()["id"]
+    assert c.post(f"/api/learners/{uid}/jobmatch", json={"text": "x" * 20001}).status_code == 422   # oversized input rejected
+    assert c.post("/api/learners", json={"name": "n" * 61, "goal": "fs"}).status_code == 422
+    assert c.post("/api/auth/login", json={"username": "u", "password": "p" * 129}).status_code == 422
+    assert c.get("/api/learners/ffffffff").status_code == 404
+    assert c.get(f"/api/learners/{uid}/question", params={"skill": "nope"}).status_code == 400
+
+
+def test_valid_mcq():
+    from backend.agents import valid_mcq
+    ok = {"q": "?", "options": ["a", "b", "c"], "answer": 2}
+    assert valid_mcq(ok, 3) and not valid_mcq({**ok, "answer": 3}, 3) and not valid_mcq({**ok, "answer": "1"}, 3)
+    assert not valid_mcq({**ok, "options": ["a"]}, 2) and not valid_mcq(None, 2) and not valid_mcq({**ok, "q": ""}, 3)

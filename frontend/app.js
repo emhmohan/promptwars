@@ -70,6 +70,17 @@ function authGo(mode) {
 }
 async function act(fn) { if (BUSY) return; BUSY = true; document.body.style.cursor = "progress"; try { await fn(); } catch (e) { alert("Error: " + e.message); } BUSY = false; document.body.style.cursor = ""; render(); }
 
+const LBL = { nm: "Your name", gl: "Target role", hr: "Hours per week", rs: "Resume text", ce: "Certifications, one per line", pj: "Projects, one per line", pce: "Certifications, one per line",
+  ppj: "Projects, one per line", au: "Username", ap: "Password", dk: "Document type", dt: "Document text", evs: "Skill for project evidence", evt: "Describe your project evidence",
+  exs: "Skill to explain", rd: "Interview round", ia: "Your answer", jd: "Job description text", mi: "Message to your mentor", sr: "Syllabus text", st: "Syllabus target role" };
+function a11y() {
+  document.querySelectorAll("#app input,#app textarea,#app select").forEach(e => {
+    if (e.getAttribute("aria-label") || e.closest("label")) return;
+    e.setAttribute("aria-label", LBL[e.id] || e.placeholder || e.name || "Field");
+  });
+  document.querySelectorAll("#app svg:not(.ico)").forEach(s => { s.setAttribute("role", "img"); if (!s.getAttribute("aria-label")) s.setAttribute("aria-label", s.querySelector("title")?.textContent || "Chart"); });
+  const live = $("#live"); if (live && ST) live.textContent = `${ST.name}: ${ST.gap.passing} of ${ST.gap.total} role tests passing, ${ST.gap.match} percent match.`;
+}
 function render() {
   const failing = ST ? ST.gap.total - ST.gap.passing : 0;
   $("#top").innerHTML = ST
@@ -78,10 +89,11 @@ function render() {
        <span class="mut">${esc(ST.name)} → ${esc(ST.role_name)}</span>${USER ? `<span class="pill">${ic("shield", "sm")}${esc(USER)}</span>` : ""}<button onclick="logout()">${ic("refresh", "sm")}${USER ? "Sign out" : "Switch learner"}</button>`
     : `<span class="kicker">career-ci · open source · self-hosted</span>`;
   $("#tabs").classList.toggle("hide", !ST);
-  if (!ST) return $("#app").innerHTML = onboardView();
-  $("#tabs").innerHTML = TABS.map(([k, n, i]) => `<button class="${TAB === k ? "on" : ""}" onclick="TAB='${k}';render()">${ic(i)}${n}</button>`).join("");
+  if (!ST) { $("#app").innerHTML = onboardView(); return a11y(); }
+  $("#tabs").innerHTML = TABS.map(([k, n, i]) => `<button class="${TAB === k ? "on" : ""}" ${TAB === k ? 'aria-current="page"' : ""} onclick="TAB='${k}';render()">${ic(i)}${n}</button>`).join("");
   $("#app").innerHTML = { build: buildView, verify: verifyView, interview: interviewView, career: careerView, org: orgView, mentor: mentorView }[TAB]();
   const l = $("#log"); if (l) l.scrollTop = l.scrollHeight;
+  a11y();
 }
 
 /* ---------- onboarding ---------- */
@@ -140,7 +152,7 @@ function createLearner() {
 /* ---------- pipeline / build status ---------- */
 function ring(p) {
   const c = 2 * Math.PI * 62, col = "var(--ink)";
-  return `<svg viewBox="0 0 150 150"><circle cx="75" cy="75" r="62" fill="none" stroke="var(--bd)" stroke-width="10"/><circle cx="75" cy="75" r="62" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c * p / 100} ${c}"/></svg><div class="v"><b>${p}%</b><span>job match</span></div>`;
+  return `<svg viewBox="0 0 150 150" aria-label="Job match ${p} percent"><circle cx="75" cy="75" r="62" fill="none" stroke="var(--bd)" stroke-width="10"/><circle cx="75" cy="75" r="62" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c * p / 100} ${c}"/></svg><div class="v"><b>${p}%</b><span>job match</span></div>`;
 }
 function pipeline() {
   const st = [["profile", 1], ["gap scan", 1], ["council", 1], ["verify", ST.ver.length > 0], ["integration", ST.interviews.length > 0 || ST.hr.length > 0], ["release", ST.ver.some(s => ST.prof[s] >= 0.6)]];
@@ -162,14 +174,14 @@ function graph() {
     const v = ST.prof[s] || 0, c = v >= 0.6 ? "n-ok" : v > 0 ? "n-wk" : "n-no", [x, y] = pos[s], pct = Math.round(v * 100);
     n += `<g><title>${esc(META.skills[s].name)} · ${pct}%${req.includes(s) ? " · required" : ""}</title>${req.includes(s) ? `<circle class="req" cx="${x}" cy="${y}" r="${R + 7}"/>` : ""}<circle class="${c}" cx="${x}" cy="${y}" r="${R}"/>${v >= 0.6 ? `<text class="tick" x="${x}" y="${y + 4}">✓</text>` : ""}<text class="nm" x="${x}" y="${y + 36}">${esc(META.skills[s].name)}</text><text class="pc" x="${x}" y="${y + 49}">${pct ? pct + "%" : "not started"}</text></g>`;
   });
-  return `<div class="ov"><svg viewBox="0 0 ${100 + Math.max(...Object.keys(L)) * CW + 80} ${rows * RH + 20}" style="min-width:${(Math.max(...Object.keys(L)) + 1) * 150}px">${e}${n}</svg></div>
+  return `<div class="ov"><svg viewBox="0 0 ${100 + Math.max(...Object.keys(L)) * CW + 80} ${rows * RH + 20}" aria-label="Skill dependency graph: ${Object.keys(META.skills).filter(k => (ST.prof[k] || 0) >= 0.6).length} verified, ${Object.keys(META.skills).filter(k => (ST.prof[k] || 0) > 0 && (ST.prof[k] || 0) < 0.6).length} unverified, of ${Object.keys(META.skills).length} skills. Required for ${esc(ST.role_name)}: ${req.map(k => esc(META.skills[k].name)).join(', ')}" style="min-width:${(Math.max(...Object.keys(L)) + 1) * 150}px">${e}${n}</svg></div>
   <div class="legend mut"><span style="--c:var(--ok)">verified</span><span style="--c:var(--wk)">weak / unverified</span><span style="--c:var(--no)">not started</span><span style="--c:var(--ac2)">required for ${esc(ST.role_name)}</span></div>`;
 }
 function timeline() {
   const T = (ST.timeline || []).slice(-30); if (T.length < 2) return '<p class="mut">Take a quiz or change the plan to start the timeline.</p>';
   const W = 520, Hh = 120, x = i => 20 + i * (W - 40) / (T.length - 1), y = m => Hh - 10 - m * (Hh - 24) / 100;
   const pts = T.map((p, i) => `${x(i).toFixed(1)},${y(p.match).toFixed(1)}`).join(" ");
-  return `<svg viewBox="0 0 ${W} ${Hh + 14}" style="width:100%;min-width:0"><line x1="20" y1="${y(0)}" x2="${W - 20}" y2="${y(0)}" stroke="var(--bd)"/><line x1="20" y1="${y(80)}" x2="${W - 20}" y2="${y(80)}" stroke="var(--bd)" stroke-dasharray="4 4"/><text x="${W - 22}" y="${y(80) - 3}" font-size="9" text-anchor="end" fill="var(--mut)">hire bar 80%</text>
+  return `<svg viewBox="0 0 ${W} ${Hh + 14}" aria-label="Job match over time, from ${T[0].match} to ${T[T.length - 1].match} percent across ${T.length} builds" style="width:100%;min-width:0"><line x1="20" y1="${y(0)}" x2="${W - 20}" y2="${y(0)}" stroke="var(--bd)"/><line x1="20" y1="${y(80)}" x2="${W - 20}" y2="${y(80)}" stroke="var(--bd)" stroke-dasharray="4 4"/><text x="${W - 22}" y="${y(80) - 3}" font-size="9" text-anchor="end" fill="var(--mut)">hire bar 80%</text>
   <polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="2"/>${T.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.match)}" r="3" fill="var(--ink)"><title>${p.match}% · ${esc(p.why)}</title></circle>`).join("")}</svg>
   <div class="mut">${T[0].match}% → <b>${T[T.length - 1].match}%</b> across ${T.length} builds</div>`;
 }

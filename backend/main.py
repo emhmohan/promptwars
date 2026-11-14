@@ -7,12 +7,14 @@ import re
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from fastapi.middleware.gzip import GZipMiddleware
 from typing import List, Optional
 
 from . import agents as A, auth, llm, orchestrator as O, store
 
-app = FastAPI(title="CareerPipe Career CI/CD")
+app = FastAPI(title="CareerPipe Career CI/CD", docs_url=None, redoc_url=None)
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 _LRN = re.compile(r"^/api/learners/([0-9a-f]{8})(?:/|$)")
 
 
@@ -32,6 +34,14 @@ async def guard(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def headers(request: Request, call_next):
+    r = await call_next(request)
+    r.headers.update({"X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer",
+                      "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'"})
+    return r
+
+
 def claim(request: Request, L):
     u = auth.user_for(bearer(request))
     if u:
@@ -40,8 +50,8 @@ def claim(request: Request, L):
 
 
 class Cred(BaseModel):
-    username: str
-    password: str
+    username: str = Field(max_length=32)
+    password: str = Field(max_length=128)
 
 
 def need(uid):
@@ -51,17 +61,17 @@ def need(uid):
 
 
 class NewLearner(BaseModel):
-    name: str
+    name: str = Field(max_length=60)
     goal: str = "fs"
-    hours: int = 8
-    claimed: List[str] = []
-    resume_text: str = ""
-    certifications: List[str] = []
-    projects: List[str] = []
+    hours: int = Field(8, ge=1, le=80)
+    claimed: List[str] = Field([], max_length=40)
+    resume_text: str = Field("", max_length=20000)
+    certifications: List[str] = Field([], max_length=30)
+    projects: List[str] = Field([], max_length=30)
 
 class Profile(BaseModel):
-    certifications: List[str] = []
-    projects: List[str] = []
+    certifications: List[str] = Field([], max_length=30)
+    projects: List[str] = Field([], max_length=30)
 
 class Choice(BaseModel):
     skill: str
@@ -71,22 +81,22 @@ class Choice(BaseModel):
 class Goal(BaseModel): goal: str
 class Hours(BaseModel): hours: int
 class Skill(BaseModel): skill: str
-class Msg(BaseModel): message: str
+class Msg(BaseModel): message: str = Field(max_length=2000)
 class Days(BaseModel): days: int = 60
 class IAnswer(BaseModel):
     round: str = "technical"
     skill: Optional[str] = None
-    question: str
-    answer: str
+    question: str = Field(max_length=2000)
+    answer: str = Field(max_length=6000)
 class Ev(BaseModel):
     skill: str
-    text: str
-class JD(BaseModel): text: str
+    text: str = Field(max_length=6000)
+class JD(BaseModel): text: str = Field(max_length=20000)
 class Doc(BaseModel):
-    text: str
+    text: str = Field(max_length=20000)
     kind: str = "resume"
 class Syl(BaseModel):
-    text: str
+    text: str = Field(max_length=20000)
     role: str = "fs"
 
 

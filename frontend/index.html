@@ -1,16 +1,21 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="CareerPipe: a multi-agent AI learning platform that makes you prove your skills with quizzes, interviews and project evidence, then re-plans when you struggle.">
+<meta name="theme-color" content="#fafafa">
 <title>CareerPipe – Career CI/CD</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230a0a0a%27/%3E%3Ctext x=%2716%27 y=%2721%27 font-size=%2714%27 font-weight=%27800%27 text-anchor=%27middle%27 fill=%27white%27 font-family=%27Arial%27%3ECP%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="style.css"></head>
 <body>
+<a class="skip" href="#app">Skip to main content</a>
 <div class="shell">
   <aside id="side">
-    <div class="brand"><span class="mark">CP</span><div><b>CareerPipe</b><small>career · ci/cd</small></div></div>
-    <nav id="tabs" class="hide"></nav>
+    <div class="brand"><span class="mark" aria-hidden="true">CP</span><div><b>CareerPipe</b><small>career · ci/cd</small></div></div>
+    <nav id="tabs" class="hide" aria-label="Main sections"></nav>
     <div class="side-foot"><span id="badge" class="badge"></span></div>
   </aside>
   <div class="content">
     <header id="top"></header>
-    <main id="app"></main>
+    <main id="app" tabindex="-1"></main>
   </div>
 </div>
+<div id="live" class="sr-only" role="status" aria-live="polite"></div>
+<noscript><p style="padding:24px">CareerPipe needs JavaScript enabled.</p></noscript>
 <script src="app.js"></script></body></html>
