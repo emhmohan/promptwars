@@ -56,11 +56,16 @@ def _hash(pw, salt):
     return hashlib.pbkdf2_hmac("sha256", pw.encode(), salt, 200_000).hex()
 
 
+def _th(tok):
+    """Tokens are stored only as SHA-256 digests, so a leaked users file cannot be replayed as sessions."""
+    return hashlib.sha256(tok.encode()).hexdigest()
+
+
 def _issue(d, u):
     tok = secrets.token_urlsafe(32)
     now = time.time()
     d["tokens"] = {t: v for t, v in d["tokens"].items() if now - v["t"] < TOKEN_DAYS * 86400}
-    d["tokens"][tok] = {"u": u, "t": now}
+    d["tokens"][_th(tok)] = {"u": u, "t": now}
     return tok
 
 
@@ -92,7 +97,7 @@ def login(username, password):
 
 def user_for(token):
     if not token: return None
-    v = _read()["tokens"].get(token)
+    v = _read()["tokens"].get(_th(token))
     return v["u"] if v and time.time() - v["t"] < TOKEN_DAYS * 86400 else None
 
 
@@ -111,4 +116,4 @@ def link(username, learner_id):
 def logout(token):
     with _lock:
         d = _load()
-        if d["tokens"].pop(token, None): _save(d)
+        if d["tokens"].pop(_th(token or ""), None): _save(d)

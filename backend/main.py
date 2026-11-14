@@ -37,6 +37,7 @@ async def guard(request: Request, call_next):
 @app.middleware("http")
 async def headers(request: Request, call_next):
     r = await call_next(request)
+    r.headers["Cache-Control"] = "no-store" if request.url.path.startswith("/api") else "public, max-age=300"
     r.headers.update({"X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer",
                       "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'"})
     return r
