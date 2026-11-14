@@ -7,7 +7,7 @@ const api = async (p, m = "GET", b) => {
   if (!r.ok) { const t = await r.text(); let d = t; try { d = JSON.parse(t).detail || t; } catch { } throw new Error(typeof d === "string" ? d : JSON.stringify(d)); }
   return r.json();
 };
-let USER = null, AUTHERR = "";
+let USER = null, AUTHERR = "", AUTHNOTE = "";
 let META, ST = null, TAB = "build", QZ = null, DQ = [], IV = null, OUT = {}, CHAT = [], BUSY = false;
 const IC = {
   check: '<path d="M20 6 9 17l-5-5"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -49,10 +49,10 @@ async function init() {
 }
 function logout() {
   if (USER) { api("/auth/logout", "POST").catch(() => { }); localStorage.removeItem("cp_tok"); USER = null; }
-  localStorage.removeItem("sf_id"); ST = null; OUT = {}; QZ = null; IV = null; CHAT = []; render();
+  AUTHNOTE = ""; localStorage.removeItem("sf_id"); ST = null; OUT = {}; QZ = null; IV = null; CHAT = []; render();
 }
 function authCard() {
-  if (USER) return `<div class="card" style="margin-bottom:12px"><span class="mut">Signed in as <b>${esc(USER)}</b>. Your profile is saved to this account.</span> <button onclick="logout()">Sign out</button></div>`;
+  if (USER) return `<div class="card" style="margin-bottom:12px"><span class="mut">Signed in as <b>${esc(USER)}</b>. ${AUTHNOTE ? esc(AUTHNOTE) : "Your profile is saved to this account."}</span> <button onclick="logout()">Sign out</button></div>`;
   return `<div class="card" style="margin-bottom:12px">${H2("shield", "Sign in to save your progress")}
   <div class="row"><input id="au" type="text" placeholder="username" autocomplete="username" style="max-width:170px"><input id="ap" type="password" placeholder="password (6+ chars)" autocomplete="current-password" style="max-width:190px" onkeydown="if(event.key==='Enter')authGo('login')">
   <button class="p" onclick="authGo('login')">Log in</button><button onclick="authGo('signup')">Create account</button></div>
@@ -63,8 +63,11 @@ function authGo(mode) {
   act(async () => {
     try {
       const r = await api("/auth/" + mode, "POST", { username: u, password: p });
-      localStorage.setItem("cp_tok", r.token); USER = r.username;
-      if (r.learner_id) { ST = await api("/learners/" + r.learner_id); localStorage.setItem("sf_id", r.learner_id); TAB = "build"; }
+      localStorage.setItem("cp_tok", r.token); USER = r.username; AUTHNOTE = "";
+      if (r.learner_id) {
+        try { ST = await api("/learners/" + r.learner_id); localStorage.setItem("sf_id", r.learner_id); TAB = "build"; }
+        catch { AUTHNOTE = "Logged in, but the saved profile could not be found (it may have been reset). Create your profile below."; }
+      } else AUTHNOTE = mode === "login" ? "Logged in. This account has no saved profile yet: create one below and it will be saved here." : "Account created. Create your profile below and it will be saved here.";
     } catch (e) { AUTHERR = e.message; }
   });
 }
