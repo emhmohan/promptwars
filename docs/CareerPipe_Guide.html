@@ -78,6 +78,19 @@ On any error (bad key, quota, network, invalid JSON) the agents silently fall ba
 <li>Verified skills decay with a half-life of 120 days; skills idle 30+ days or below the bar show a refresh-due banner.</li>
 <li>Project evidence scores concrete detail out of 10 (rule-based, enriched by the LLM); 6/10 or more verifies the skill at a 62% floor, lower than a full quiz plus interview.</li>
 <li>Certifications and projects in the profile add the skills they mention as claims to verify.</li>
+<li><b>Hard test from a document:</b> in the Verify tab, upload a .txt/.md file (or paste text) of a resume, course description or job description. The Profile Agent finds the skills, and "Hard test" asks AI-written scenario and code-reading questions from that document. A correct hard answer counts double. Needs an AI provider; without one it falls back to the hardest bank question.</li>
+<li><b>Job match and resume:</b> paste a job posting to see how much your verified skills cover; the Resume Agent writes bullets from verified evidence only.</li>
+</ul>
+
+<h2>5a. Accounts (optional)</h2>
+<p>Sign up or log in on the landing page and your profile, evidence and plan come back whenever you return. Passwords are salted PBKDF2 hashes, sessions are random bearer tokens, and a profile that belongs to an account can only be opened with that account. Guests and the demo work without signing in. On free hosting with an ephemeral disk (e.g. Render), accounts reset on restart.</p>
+
+<h2>5b. Security, accessibility and testing</h2>
+<ul>
+<li><b>Security:</b> no keys in the repo, input size limits on every endpoint, CSP / X-Frame-Options / nosniff headers, API docs disabled, user text HTML-escaped.</li>
+<li><b>Efficiency:</b> gzip, atomic file writes, LLM backoff on rate limits, LLM used only where it adds value.</li>
+<li><b>Accessibility:</b> skip link, landmarks, labelled controls, text alternatives for charts, live region, keyboard focus, reduced motion.</li>
+<li><b>Testing:</b> 18 automated tests: <code>PYTHONPATH=. pytest -q tests</code>.</li>
 </ul>
 
 <h2>6. Adding roles, skills and questions</h2>

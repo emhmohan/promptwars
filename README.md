@@ -41,7 +41,7 @@ Five-minute walkthrough: see `docs/CareerPipe_Guide.html` / `CareerPipe_Guide.pd
 ## Limitations and next steps
 - Skill verification is evidence-based (quizzes, interview answers, project evidence), not proctored. Scores are estimates, not certification.
 - Storage is a JSON file; swap `store.py` for a database in production.
-- Next: GitHub repo analysis for evidence, timed questions, and user accounts.
+- Next: GitHub repo analysis for evidence, timed questions, and a real database for accounts.
 
 ## Docker
 ```bash
