@@ -1,9 +1,13 @@
 const $ = s => document.querySelector(s);
 const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const tok = () => { try { return localStorage.getItem("cp_tok") || ""; } catch { return ""; } };
 const api = async (p, m = "GET", b) => {
-  const r = await fetch("/api" + p, { method: m, headers: { "Content-Type": "application/json" }, body: b ? JSON.stringify(b) : undefined });
-  if (!r.ok) throw new Error(await r.text()); return r.json();
+  const h = { "Content-Type": "application/json" }; if (tok()) h.Authorization = "Bearer " + tok();
+  const r = await fetch("/api" + p, { method: m, headers: h, body: b ? JSON.stringify(b) : undefined });
+  if (!r.ok) { const t = await r.text(); let d = t; try { d = JSON.parse(t).detail || t; } catch { } throw new Error(typeof d === "string" ? d : JSON.stringify(d)); }
+  return r.json();
 };
+let USER = null, AUTHERR = "";
 let META, ST = null, TAB = "build", QZ = null, DQ = [], IV = null, OUT = {}, CHAT = [], BUSY = false;
 const IC = {
   check: '<path d="M20 6 9 17l-5-5"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -35,11 +39,35 @@ const hue = s => parseInt(hash(s).slice(0, 3), 16) % 360;
 async function init() {
   META = await api("/meta"); const s = await api("/status");
   $("#badge").innerHTML = `<span class="dotlive"></span>` + esc(s.provider === "mock" ? "rule-based agents" : `${s.provider} · ${s.model}` + (s.ready ? "" : " · KEY MISSING"));
-  const id = localStorage.getItem("sf_id");
+  let id = localStorage.getItem("sf_id");
+  if (tok()) {
+    try { const m = await api("/auth/me"); USER = m.username; id = m.learner_id || null; }
+    catch { localStorage.removeItem("cp_tok"); id = localStorage.getItem("sf_id"); }
+  }
   if (id) { try { ST = await api("/learners/" + id); } catch { localStorage.removeItem("sf_id"); } }
   render();
 }
-function logout() { localStorage.removeItem("sf_id"); ST = null; OUT = {}; QZ = null; IV = null; CHAT = []; render(); }
+function logout() {
+  if (USER) { api("/auth/logout", "POST").catch(() => { }); localStorage.removeItem("cp_tok"); USER = null; }
+  localStorage.removeItem("sf_id"); ST = null; OUT = {}; QZ = null; IV = null; CHAT = []; render();
+}
+function authCard() {
+  if (USER) return `<div class="card" style="margin-bottom:12px"><span class="mut">Signed in as <b>${esc(USER)}</b>. Your profile is saved to this account.</span> <button onclick="logout()">Sign out</button></div>`;
+  return `<div class="card" style="margin-bottom:12px">${H2("shield", "Sign in to save your progress")}
+  <div class="row"><input id="au" type="text" placeholder="username" autocomplete="username" style="max-width:170px"><input id="ap" type="password" placeholder="password (6+ chars)" autocomplete="current-password" style="max-width:190px" onkeydown="if(event.key==='Enter')authGo('login')">
+  <button class="p" onclick="authGo('login')">Log in</button><button onclick="authGo('signup')">Create account</button></div>
+  ${AUTHERR ? `<p class="mut" style="color:var(--bad)">${esc(AUTHERR)}</p>` : ""}<p class="mut">Optional. Without an account you can still try everything as a guest on this browser.</p></div>`;
+}
+function authGo(mode) {
+  const u = $("#au").value, p = $("#ap").value; AUTHERR = "";
+  act(async () => {
+    try {
+      const r = await api("/auth/" + mode, "POST", { username: u, password: p });
+      localStorage.setItem("cp_tok", r.token); USER = r.username;
+      if (r.learner_id) { ST = await api("/learners/" + r.learner_id); localStorage.setItem("sf_id", r.learner_id); TAB = "build"; }
+    } catch (e) { AUTHERR = e.message; }
+  });
+}
 async function act(fn) { if (BUSY) return; BUSY = true; document.body.style.cursor = "progress"; try { await fn(); } catch (e) { alert("Error: " + e.message); } BUSY = false; document.body.style.cursor = ""; render(); }
 
 function render() {
@@ -47,7 +75,7 @@ function render() {
   $("#top").innerHTML = ST
     ? `<span class="pill">${ic("branch", "sm")}<b>${esc(ST.goal)}</b></span><span class="pill mono">build #${hash(ST.id + ST.log.length)}</span>
        <span class="pill ${failing ? "bad" : "ok"}">${ic(failing ? "x" : "check", "sm")}${failing ? failing + " failing" : "passing"}</span><span class="sp"></span>
-       <span class="mut">${esc(ST.name)} → ${esc(ST.role_name)}</span><button onclick="logout()">${ic("refresh", "sm")}Switch learner</button>`
+       <span class="mut">${esc(ST.name)} → ${esc(ST.role_name)}</span>${USER ? `<span class="pill">${ic("shield", "sm")}${esc(USER)}</span>` : ""}<button onclick="logout()">${ic("refresh", "sm")}${USER ? "Sign out" : "Switch learner"}</button>`
     : `<span class="kicker">career-ci · open source · self-hosted</span>`;
   $("#tabs").classList.toggle("hide", !ST);
   if (!ST) return $("#app").innerHTML = onboardView();
@@ -75,7 +103,7 @@ function onboardView() {
 <span class="r">${ic("x")}</span> React         missing  <span class="d">(needs JavaScript)</span>
 <span class="r">${ic("x")}</span> Node.js       missing
 <span class="d">3 failing · council convened · roadmap ~9 weeks</span></pre></div></div>
-  <div class="card">${H2("sliders", "Initialise profile")}
+  <div>${authCard()}<div class="card">${H2("sliders", "Initialise profile")}
   <div class="row"><input id="nm" type="text" placeholder="Your name" value="${esc(FORM.nm)}" style="max-width:200px">
   <select id="gl">${Object.entries(META.roles).map(([k, r]) => `<option value="${k}" ${k === FORM.gl ? "selected" : ""}>${r.name}</option>`).join("")}</select>
   <label class="mut">h/week <input id="hr" type="number" min="1" max="40" value="${FORM.hr}" style="width:64px"></label></div>
@@ -87,7 +115,7 @@ function onboardView() {
   <textarea id="ce" placeholder="e.g. Google Data Analytics Certificate&#10;freeCodeCamp Responsive Web Design">${esc(FORM.ce)}</textarea></div>
   <div><p class="mut">Projects (one per line):</p>
   <textarea id="pj" placeholder="e.g. Built a Flask REST API with PostgreSQL&#10;Portfolio site in HTML and CSS">${esc(FORM.pj)}</textarea></div></div>
-  <div class="row" style="margin-top:12px"><button class="p" onclick="createLearner()">${ic("play", "sm")}Run first build</button><button onclick="guidedDemo()">${ic("play", "sm")}Guided demo (Asha story)</button></div></div></div>`;
+  <div class="row" style="margin-top:12px"><button class="p" onclick="createLearner()">${ic("play", "sm")}Run first build</button><button onclick="guidedDemo()">${ic("play", "sm")}Guided demo (Asha story)</button></div></div></div></div>`;
 }
 function submitEvidence() {
   const t = $("#evt").value.trim(); if (t.length < 10) return;

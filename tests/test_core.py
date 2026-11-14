@@ -176,3 +176,22 @@ def test_document_hard_test():
     assert {"python", "sql", "react"} <= set(r["skills"]) and "react" in r["state"]["claimed"]
     q = c.get(f"/api/learners/{uid}/question", params={"skill": "python", "hard": True}).json()
     assert q["level"] in ("hard", "hard-fallback") and len(q["options"]) >= 3
+
+
+def test_accounts():
+    assert c.post("/api/auth/signup", json={"username": "ab", "password": "secret1"}).status_code == 400
+    assert c.post("/api/auth/signup", json={"username": "asha_k", "password": "123"}).status_code == 400
+    r = c.post("/api/auth/signup", json={"username": "Asha_K", "password": "secret1"}).json()
+    h = {"Authorization": "Bearer " + r["token"]}
+    assert r["username"] == "asha_k" and r["learner_id"] is None
+    assert c.post("/api/auth/signup", json={"username": "asha_k", "password": "secret1"}).status_code == 400
+    uid = c.post("/api/learners", headers=h, json={"name": "Asha", "goal": "fs", "claimed": ["python"]}).json()["id"]
+    assert c.get(f"/api/learners/{uid}").status_code == 401                    # owned profile needs the token
+    assert c.get(f"/api/learners/{uid}", headers={"Authorization": "Bearer nope"}).status_code == 401
+    assert c.get(f"/api/learners/{uid}", headers=h).status_code == 200
+    assert c.post("/api/auth/login", json={"username": "asha_k", "password": "wrong"}).status_code == 400
+    l = c.post("/api/auth/login", json={"username": "asha_k", "password": "secret1"}).json()
+    assert l["learner_id"] == uid                                              # progress comes back on login
+    assert c.get("/api/auth/me", headers={"Authorization": "Bearer " + l["token"]}).json()["learner_id"] == uid
+    guest = c.post("/api/learners", json={"name": "G", "goal": "fs", "claimed": []}).json()["id"]
+    assert c.get(f"/api/learners/{guest}").status_code == 200                  # guests still work

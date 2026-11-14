@@ -3,14 +3,45 @@ import pathlib
 from dotenv import load_dotenv
 load_dotenv(pathlib.Path(__file__).resolve().parent.parent / ".env")
 
-from fastapi import FastAPI, HTTPException
+import re
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional
 
-from . import agents as A, llm, orchestrator as O, store
+from . import agents as A, auth, llm, orchestrator as O, store
 
 app = FastAPI(title="CareerPipe Career CI/CD")
+_LRN = re.compile(r"^/api/learners/([0-9a-f]{8})(?:/|$)")
+
+
+def bearer(request: Request):
+    h = request.headers.get("authorization", "")
+    return h[7:] if h.startswith("Bearer ") else ""
+
+
+@app.middleware("http")
+async def guard(request: Request, call_next):
+    """A learner that belongs to an account can only be opened with that account's token. Guests/demo learners stay open."""
+    m = _LRN.match(request.url.path)
+    if m:
+        L = store.get(m.group(1))
+        if L and L.get("owner") and auth.user_for(bearer(request)) != L["owner"]:
+            return JSONResponse({"detail": "Sign in to the account that owns this profile."}, status_code=401)
+    return await call_next(request)
+
+
+def claim(request: Request, L):
+    u = auth.user_for(bearer(request))
+    if u:
+        L["owner"] = u; store.save(L); auth.link(u, L["id"])
+    return L
+
+
+class Cred(BaseModel):
+    username: str
+    password: str
 
 
 def need(uid):
@@ -70,10 +101,33 @@ def meta():
 @app.get("/api/learners")
 def learners(): return [{"id": L["id"], "name": L["name"], "goal": L["goal"]} for L in store.all_learners()]
 
+@app.post("/api/auth/signup")
+def signup(b: Cred):
+    try: tok, u, lid = auth.signup(b.username, b.password)
+    except ValueError as e: raise HTTPException(400, str(e))
+    return {"token": tok, "username": u, "learner_id": lid}
+
+@app.post("/api/auth/login")
+def login(b: Cred):
+    try: tok, u, lid = auth.login(b.username, b.password)
+    except ValueError as e: raise HTTPException(400, str(e))
+    return {"token": tok, "username": u, "learner_id": lid}
+
+@app.get("/api/auth/me")
+def me(request: Request):
+    u = auth.user_for(bearer(request))
+    if not u: raise HTTPException(401, "not signed in")
+    return {"username": u, "learner_id": auth.learner_of(u)}
+
+@app.post("/api/auth/logout")
+def logout(request: Request):
+    auth.logout(bearer(request)); return {"ok": True}
+
 @app.post("/api/learners")
-def create(b: NewLearner):
+def create(b: NewLearner, request: Request):
     if b.goal not in A.ROLES: raise HTTPException(400, "unknown role")
-    return O.snapshot(O.onboard(b.name, b.goal, b.hours, [s for s in b.claimed if s in A.SK], b.resume_text, b.certifications, b.projects))
+    L = O.onboard(b.name, b.goal, b.hours, [s for s in b.claimed if s in A.SK], b.resume_text, b.certifications, b.projects)
+    return O.snapshot(claim(request, L))
 
 @app.put("/api/learners/{uid}/profile")
 def profile(uid: str, b: Profile): return O.snapshot(O.update_profile(need(uid), b.certifications, b.projects))
@@ -167,7 +221,7 @@ def syllabus(b: Syl):
     return A.CohortAnalyst().syllabus(b.text, b.role)
 
 @app.post("/api/demo/guided")
-def guided():
+def guided(request: Request):
     """One-click replay of the story: onboard, verify, fail React (root-cause re-plan), add project evidence."""
     L = O.onboard("Asha", "fs", 8, ["python", "sql", "html"],
                   "", ["Meta Front-End Developer certificate"], ["Built a Python script that loads SQL data into a dashboard"])
@@ -176,7 +230,7 @@ def guided():
         O.answer(L, sk, next((p["answer"] for p in pool if p["q"] == q["q"]), pool[0]["answer"]), "diagnostic")
     O.fail(L, "react", "guided demo: simulated quiz failure")
     O.evidence(L, "html", "Built a responsive portfolio site in HTML and CSS, deployed on GitHub Pages, tested layouts at 3 breakpoints, designed accessible forms, 120 visitors.")
-    return O.snapshot(L)
+    return O.snapshot(claim(request, L))
 
 @app.post("/api/demo/seed")
 def seed():

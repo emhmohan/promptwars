@@ -3,3 +3,4 @@ __pycache__/
 .venv/
 backend/data/learners.json
 *.pyc
+backend/data/*_users.json
