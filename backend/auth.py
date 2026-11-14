@@ -1,5 +1,5 @@
 """Optional accounts: salted PBKDF2 password hashes + random bearer tokens, stored beside the learner DB."""
-import hashlib, hmac, json, os, re, secrets, threading, time
+import copy, hashlib, hmac, json, os, re, secrets, threading, time
 
 from . import store
 
@@ -12,14 +12,44 @@ def _path():
     return p.with_name(p.stem + "_users.json")
 
 
-def _load():
+_cache = {"key": None, "data": None}
+_fails = {}
+MAX_FAILS, WINDOW = 8, 300
+
+
+def _read():
+    """Parsed users file, re-read only when it changed. Read-only: do not mutate."""
     p = _path()
-    return json.loads(p.read_text()) if p.exists() else {"users": {}, "tokens": {}}
+    if not p.exists(): return {"users": {}, "tokens": {}}
+    st = p.stat(); k = (str(p), st.st_mtime_ns, st.st_size)
+    if _cache["key"] != k:
+        _cache["data"] = json.loads(p.read_text()); _cache["key"] = k
+    return _cache["data"]
+
+
+def _load():
+    return copy.deepcopy(_read())
+
+
+def throttled(key):
+    """True when this key (ip+username) has made too many recent failed logins."""
+    now = time.time()
+    recent = [t for t in _fails.get(key, []) if now - t < WINDOW]
+    _fails[key] = recent
+    return len(recent) >= MAX_FAILS
+
+
+def note_fail(key):
+    _fails.setdefault(key, []).append(time.time())
+
+
+def clear_fails(key):
+    _fails.pop(key, None)
 
 
 def _save(d):
     p = _path(); tmp = p.with_suffix(".tmp")
-    tmp.write_text(json.dumps(d, indent=1)); os.replace(tmp, p)
+    tmp.write_text(json.dumps(d, separators=(",", ":"))); os.replace(tmp, p)
 
 
 def _hash(pw, salt):
@@ -62,12 +92,12 @@ def login(username, password):
 
 def user_for(token):
     if not token: return None
-    v = _load()["tokens"].get(token)
+    v = _read()["tokens"].get(token)
     return v["u"] if v and time.time() - v["t"] < TOKEN_DAYS * 86400 else None
 
 
 def learner_of(username):
-    rec = _load()["users"].get(username)
+    rec = _read()["users"].get(username)
     return rec["learner"] if rec else None
 
 

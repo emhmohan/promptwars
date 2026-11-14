@@ -197,6 +197,19 @@ def test_accounts():
     assert c.get(f"/api/learners/{guest}").status_code == 200                  # guests still work
 
 
+def test_login_throttle():
+    for _ in range(8):
+        assert c.post("/api/auth/login", json={"username": "ghost_user", "password": "nope123"}).status_code == 400
+    assert c.post("/api/auth/login", json={"username": "ghost_user", "password": "nope123"}).status_code == 429
+
+
+def test_store_cache_isolated():
+    uid = c.post("/api/learners", json={"name": "C", "goal": "fs", "claimed": []}).json()["id"]
+    from backend import store
+    a = store.get(uid); a["name"] = "mutated"
+    assert store.get(uid)["name"] == "C"                                       # cached data is not shared by reference
+
+
 def test_security_limits_and_headers():
     r = c.get("/api/status")
     assert r.headers["x-content-type-options"] == "nosniff" and r.headers["x-frame-options"] == "DENY"

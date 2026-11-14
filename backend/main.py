@@ -118,9 +118,13 @@ def signup(b: Cred):
     return {"token": tok, "username": u, "learner_id": lid}
 
 @app.post("/api/auth/login")
-def login(b: Cred):
+def login(b: Cred, request: Request):
+    key = f"{request.client.host if request.client else '?'}|{b.username.strip().lower()}"
+    if auth.throttled(key): raise HTTPException(429, "Too many failed attempts. Wait a few minutes and try again.")
     try: tok, u, lid = auth.login(b.username, b.password)
-    except ValueError as e: raise HTTPException(400, str(e))
+    except ValueError as e:
+        auth.note_fail(key); raise HTTPException(400, str(e))
+    auth.clear_fails(key)
     return {"token": tok, "username": u, "learner_id": lid}
 
 @app.get("/api/auth/me")

@@ -87,10 +87,10 @@ On any error (bad key, quota, network, invalid JSON) the agents silently fall ba
 
 <h2>5b. Security, accessibility and testing</h2>
 <ul>
-<li><b>Security:</b> no keys in the repo, input size limits on every endpoint, CSP / X-Frame-Options / nosniff headers, API docs disabled, user text HTML-escaped.</li>
-<li><b>Efficiency:</b> gzip, atomic file writes, LLM backoff on rate limits, LLM used only where it adds value.</li>
+<li><b>Security:</b> no keys in the repo, login brute-force throttling, input size limits on every endpoint, CSP / X-Frame-Options / nosniff headers, API docs disabled, user text HTML-escaped.</li>
+<li><b>Efficiency:</b> gzip, cached file reads, atomic file writes, LLM backoff on rate limits, LLM used only where it adds value.</li>
 <li><b>Accessibility:</b> skip link, landmarks, labelled controls, text alternatives for charts, live region, keyboard focus, reduced motion.</li>
-<li><b>Testing:</b> 18 automated tests: <code>PYTHONPATH=. pytest -q tests</code>.</li>
+<li><b>Testing:</b> 20 automated tests: <code>PYTHONPATH=. pytest -q tests</code>.</li>
 </ul>
 
 <h2>6. Adding roles, skills and questions</h2>
