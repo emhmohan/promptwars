@@ -71,7 +71,13 @@ function authGo(mode) {
     } catch (e) { AUTHERR = e.message; }
   });
 }
-async function act(fn) { if (BUSY) return; BUSY = true; document.body.style.cursor = "progress"; try { await fn(); } catch (e) { alert("Error: " + e.message); } BUSY = false; document.body.style.cursor = ""; render(); }
+async function act(fn) { if (BUSY) return; BUSY = true; document.body.style.cursor = "progress"; try { await fn(); } catch (e) {
+    if (/learner not found|Sign in to the account/.test(e.message)) {
+      try { localStorage.removeItem("cp_tok"); localStorage.removeItem("sf_id"); } catch { }
+      USER = null; ST = null; OUT = {}; QZ = null; IV = null; CHAT = [];
+      AUTHERR = "The server was restarted and its saved data was reset (free hosting has a temporary disk). Please create your profile again.";
+    } else alert("Error: " + e.message);
+  } BUSY = false; document.body.style.cursor = ""; render(); }
 
 const LBL = { nm: "Your name", gl: "Target role", hr: "Hours per week", rs: "Resume text", ce: "Certifications, one per line", pj: "Projects, one per line", pce: "Certifications, one per line",
   ppj: "Projects, one per line", au: "Username", ap: "Password", dk: "Document type", dt: "Document text", evs: "Skill for project evidence", evt: "Describe your project evidence",
