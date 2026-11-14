@@ -68,7 +68,7 @@ function authGo(mode) {
         try { ST = await api("/learners/" + r.learner_id); localStorage.setItem("sf_id", r.learner_id); TAB = "build"; }
         catch { AUTHNOTE = "Logged in, but the saved profile could not be found (it may have been reset). Create your profile below."; }
       } else AUTHNOTE = mode === "login" ? "Logged in. This account has no saved profile yet: create one below and it will be saved here." : "Account created. Create your profile below and it will be saved here.";
-    } catch (e) { AUTHERR = e.message; }
+    } catch (e) { AUTHERR = e.message + (mode === "login" && /Wrong username/.test(e.message) ? ". If the site was recently redeployed, accounts are reset on free hosting: use Create account again." : ""); }
   });
 }
 async function act(fn) { if (BUSY) return; BUSY = true; document.body.style.cursor = "progress"; try { await fn(); } catch (e) {
